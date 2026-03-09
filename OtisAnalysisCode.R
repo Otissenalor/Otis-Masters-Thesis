@@ -1,8 +1,7 @@
 # =========================================
 # Biochar Cocoa Farm Analysis Script
 # =========================================
-# setwd("/Users/otissenalor/Documents/Otis Masters Thesis") # If you have a project, you don't need to set absolute paths.
-# THIS AVOIDS PROBLEMS IN THE SECOND LINE OF CODE ALREADY. THAT IS THE BEAUTY OF THE Rproj. ;)
+# setwd("/Users/otissenalor/Documents/Otis Masters Thesis")
 # -----------------------------
 # 1. Setup
 # -----------------------------
@@ -33,17 +32,15 @@ ndvi_df <- df %>%
   summarise(NDVI = mean(Mean.NDVI, na.rm = TRUE), .groups = "drop") %>%
   tidyr::pivot_wider(names_from = Season, values_from = NDVI) %>%
   mutate(Delta = Dry - Wet)   # Δ = Dry − Wet
-# --> This is very risky! If your data is not correctly organized, you will get the wrong results
-# The correct way to do this is having a unique ID for each tree (i.e., each repeated measure )
+
 
 # Boxplot of Δ NDVI by Treatment
 ggplot(ndvi_df, aes(x = Treatment, y = Delta, fill = Treatment)) +
   geom_boxplot() +
   labs(title = "Δ NDVI (Dry - Wet) by Treatment", y = "Δ NDVI") +
   theme(legend.position = "none")
-# --> I love the plot but would be nice to see the significancy
 
-# Clean data: remove NA and ensure Treatment is a factor
+
 ndvi_df_clean <- ndvi_df %>%
   filter(!is.na(Delta), !is.na(Treatment)) %>%
   mutate(Treatment = factor(Treatment))
@@ -98,7 +95,6 @@ run_contrast <- function(df, trt1, trt2){
   list(contrast = contrast, t_test = t_res)
 }
 
-# ---->  Did you check if your data allows you to perform parametric stats?
 
 
 # Run contrasts
@@ -142,14 +138,14 @@ plot_contrast_box(contrast_TSBCM_TSM, "TS_BCM", "TS_M")
 plot_contrast_box(contrast_IBCM_TSBCM, "I_BCM", "TS_BCM")
 plot_contrast_box(contrast_TSBCO_TSO, "TS_BCO", "TS_O")
 plot_contrast_box(contrast_IBCO_TSBCO, "I_BCO", "TS_BCO")
-# I think the full plot is considerably easier to see the full analysis... I would keep just that and maybe put the contrast ones in the appendix.
+
 # -----------------------------
 # 5. Per-Tree Analyses
 # -----------------------------
 # 5.1 Matured Pods
 mod_mature <- glmmTMB::glmmTMB(Matured.pod ~ Treatment*Season + Diameter + (1|Farm) + (1|TreeUID),
                                data = df, family = poisson) # This works without error,
-# but the individual TreeUID is still wrong! This invalidates your results!!!
+
 
 summary(mod_mature)
 emmeans_mature <- emmeans(mod_mature, pairwise ~ Treatment|Season)
@@ -210,7 +206,7 @@ ggplot() +
 anova_mature <- car::Anova(mod_mature, type = 3)   # Type III ANOVA
 anova_df <- broom::tidy(anova_mature)             # Convert to data frame
 write.csv(anova_df, "Matured_pods_anova_results.csv", row.names = FALSE)
-# ---> Make sure you can do a parametric comparison here! Same for all ANOVA and t-tests!
+
 
 # EMMeans results
 emmeans_mature <- emmeans(mod_mature, pairwise ~ Treatment2|Season)
@@ -222,6 +218,47 @@ write.csv(emmeans_df, "Matured_pods_emmeans_results.csv", row.names = FALSE)
 # Save pairwise contrasts if needed
 contrast_df <- as.data.frame(emmeans_mature$contrasts)
 write.csv(contrast_df, "Matured_pods_pairwise_contrasts.csv", row.names = FALSE)
+
+
+
+###Delta MaturedPod###
+
+# 1. Prediction grid by Diameter & Season
+pred_grid_m <- expand.grid(
+  Diameter = seq(min(df$Diameter, na.rm = TRUE),
+                 max(df$Diameter, na.rm = TRUE),
+                 length.out = 200),
+  Treatment2 = levels(df$Treatment2),
+  Season = c("Dry", "Wet")
+)
+
+# 2. Predictions for each Season
+pred_grid_m$Predicted <- predict(mod_mature,
+                                 newdata = pred_grid_m,
+                                 type = "response",
+                                 re.form = NA)
+
+# 3. Compute Delta = Dry - Wet for each Treatment group
+delta_mature_curve <- pred_grid_m %>%
+  select(Diameter, Treatment2, Season, Predicted) %>%
+  tidyr::pivot_wider(names_from = Season, values_from = Predicted) %>%
+  mutate(Delta = Dry - Wet)
+
+# 4. Plot Matured Pods Delta Curve
+ggplot(delta_mature_curve, aes(x = Diameter, y = Delta, color = Treatment2)) +
+  geom_line(size = 1.3) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(
+    x = "Tree Diameter (cm)",
+    y = "Dry – Wet Delta (Predicted Matured Pods)",
+    color = "Treatment"
+  ) +
+  scale_color_manual(values = c(
+    "Without Biochar" = "red",
+    "With Biochar" = "blue"
+  )) +
+  theme_bw() +
+  theme(text = element_text(size = 14))
 
 
 
@@ -286,12 +323,52 @@ contrast_df <- as.data.frame(emmeans_young$contrasts)
 write.csv(contrast_df, "Young_pods_pairwise_contrasts.csv", row.names = FALSE)
 
 
+
+###Delta Young Pods###
+
+
+# 1. Prediction grid
+pred_grid_y <- expand.grid(
+  Diameter = seq(min(df$Diameter, na.rm = TRUE),
+                 max(df$Diameter, na.rm = TRUE),
+                 length.out = 200),
+  Treatment2 = levels(df$Treatment2),
+  Season = c("Dry", "Wet")
+)
+
+# 2. Predictions
+pred_grid_y$Predicted <- predict(mod_young,
+                                 newdata = pred_grid_y,
+                                 type = "response",
+                                 re.form = NA)
+
+# 3. Compute Delta
+delta_young_curve <- pred_grid_y %>%
+  select(Diameter, Treatment2, Season, Predicted) %>%
+  tidyr::pivot_wider(names_from = Season, values_from = Predicted) %>%
+  mutate(Delta = Dry - Wet)
+
+# 4. Plot Young Pod Delta Curve
+ggplot(delta_young_curve, aes(x = Diameter, y = Delta, color = Treatment2)) +
+  geom_line(size = 1.3) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(
+    x = "Tree Diameter (cm)",
+    y = "Dry – Wet Delta (Predicted Young Pods)",
+    color = "Biochar Treatment"
+  ) +
+  scale_color_manual(values = c(
+    "Without Biochar" = "red",
+    "With Biochar" = "blue"
+  )) +
+  theme_bw() +
+  theme(text = element_text(size = 14))
+
+
 # 5.3 Canopy Health
 mod_canopy <- lmer(as.numeric(Canopy.health) ~ Treatment*Season + (1|Farm), data = df)
 summary(mod_canopy)
-# ---> Where is your TreeUID??? You can't ignore it. The canopy health from the
-# wet season of Tree 1 is NOT INDEPENDENT of the canopy health of Tree 1 in the
-# dry season!
+
 
 # ANOVA table
 anova_canopy <- car::Anova(mod_canopy, type = 3)   # Type III ANOVA
@@ -357,7 +434,7 @@ delta_vars <- dplyr::select(soil_delta, starts_with("Delta_"))
 manova_model <- manova(cbind(Delta_pH, Delta_N, Delta_P, Delta_K, Delta_Ca, Delta_Mg, Delta_OC, Delta_OM) ~ Treatment + Farm,
                        data = soil_delta)
 summary(manova_model, test = "Pillai") # Use Pillai's Trace for robustness
-# This would probably be a more adequate way to handle this.
+
 summary.aov(manova_model)
 
 
