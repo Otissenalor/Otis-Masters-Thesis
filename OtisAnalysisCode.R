@@ -75,11 +75,6 @@ ggplot(ndvi_df_clean, aes(x = Treatment, y = Delta, fill = Treatment)) +
 # Exclude Farm 1 from the dataset
 ndvi_df_sub <- subset(ndvi_df, Farm != "Farm1")
 
-# Run contrasts on the filtered data
-contrast_TSBCM_TSM <- run_contrast(ndvi_df_sub, "TS_BCM", "TS_M")
-contrast_IBCM_TSBCM <- run_contrast(ndvi_df_sub, "I_BCM", "TS_BCM")
-contrast_TSBCO_TSO <- run_contrast(ndvi_df_sub, "TS_BCO", "TS_O")
-contrast_IBCO_TSBCO <- run_contrast(ndvi_df_sub, "I_BCO", "TS_BCO")
 
 # -----------------------------
 # 4. NDVI Contrasts & Paired t-tests
@@ -95,6 +90,12 @@ run_contrast <- function(df, trt1, trt2){
   list(contrast = contrast, t_test = t_res)
 }
 
+
+# Run contrasts on the filtered data
+contrast_TSBCM_TSM <- run_contrast(ndvi_df_sub, "TS_BCM", "TS_M")
+contrast_IBCM_TSBCM <- run_contrast(ndvi_df_sub, "I_BCM", "TS_BCM")
+contrast_TSBCO_TSO <- run_contrast(ndvi_df_sub, "TS_BCO", "TS_O")
+contrast_IBCO_TSBCO <- run_contrast(ndvi_df_sub, "I_BCO", "TS_BCO")
 
 
 # Run contrasts
